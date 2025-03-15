@@ -103,6 +103,10 @@ while running:
     # draw sensor rays
     for first_intersect in first_intersects:
         pygame.draw.line(screen, RED, source1, first_intersect, 3)
+    
+    # draw tracks
+    for wall in training_track:
+        pygame.draw.line(screen, BLACK, (wall[0], wall[1]), (wall[2], wall[3]), 1)
 
     pygame.display.flip()
 
