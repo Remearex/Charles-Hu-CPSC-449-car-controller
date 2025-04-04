@@ -8,7 +8,7 @@ track = training_track
 
 L, W = 60, 30
 d = 50
-velocity = 200
+velocity = 100
 dt = 1/60
 
 # initial state
@@ -22,20 +22,31 @@ source1 = None
 first_intersects = [0] * len(ray_angles)
 ray_lengths = [0] * len(ray_angles)    
 
-def update():
+def update(model_params):
     global x, y, theta, steering_angle, d, dt
 
-    keys = pygame.key.get_pressed()
-    if keys[pygame.K_LEFT]:
-        steering_angle = math.radians(30)
-    if keys[pygame.K_RIGHT]:
-        steering_angle = math.radians(-30)
-    if not keys[pygame.K_LEFT] and not keys[pygame.K_RIGHT]:
-        steering_angle = 0
+    # keys = pygame.key.get_pressed()
+    # if keys[pygame.K_LEFT]:
+    #     steering_angle = math.radians(30)
+    # if keys[pygame.K_RIGHT]:
+    #     steering_angle = math.radians(-30)
+    # if not keys[pygame.K_LEFT] and not keys[pygame.K_RIGHT]:
+    #     steering_angle = 0
+    nearest_dist = math.inf
+    for i in range(int(len(model_params) / (len(ray_angles)+1))):
+        neighbor = np.zeros(len(ray_angles))
+        for j in range(len(ray_angles)):
+            neighbor[j] = model_params[i*(len(ray_angles)+1)+j]
+        dist = np.linalg.norm(ray_angles - neighbor)
+        if dist < nearest_dist:
+            nearest_dist = dist
+            corresponding_steering_angle = model_params[i*(len(ray_angles)+1)+len(ray_angles)]
+            steering_angle = max(math.radians(-30), min(math.radians(30), corresponding_steering_angle))
+        
     
     x += -dt * velocity * math.sin(theta)
     y += -dt * velocity * math.cos(theta)
-    theta += (dt * velocity * math.tan(steering_angle))/d
+    theta += (dt * 2 * velocity * math.tan(steering_angle))/d
     if (theta > 2*math.pi):
         theta -= 2*math.pi
     if (theta < 0):
@@ -123,14 +134,15 @@ def simulate(model_params, display=True):
         running = True
         clock = pygame.time.Clock()
 
-    x = WIDTH / 2
-    y = 4*HEIGHT/5
+    x = WIDTH / 4
+    y = HEIGHT-50
+    theta = 0
     num_ticks = 0
     running = True
     while running:
         num_ticks += 1
-        update()
-    
+        update(model_params)
+
         if display:
             clock.tick(60)
             screen.fill(WHITE)
@@ -167,9 +179,37 @@ def simulate(model_params, display=True):
     
     return num_ticks
 
-print(simulate(None, True))
+
+num_neighbors = 10
+max_iter = 100000
+
+def train():
+    global num_neighbors
+
+    model_params = np.zeros(num_neighbors * (len(ray_angles) + 1))
+    for i in range(num_neighbors):
+        for j in range(len(ray_angles)):
+            model_params[i*(len(ray_angles)+1)+j] = np.random.normal(loc=400, scale=100)
+        model_params[i*(len(ray_angles)+1) + len(ray_angles)] = np.random.normal(loc=0, scale=math.radians(10))
+    score = simulate(model_params, False)
+
+    display = False
+    for iter in range(max_iter):
+        delta_model_params = np.zeros(len(model_params))
+        for i in range(num_neighbors):
+            for j in range(len(ray_angles)):
+                delta_model_params[i*(len(ray_angles)+1) + j] = np.random.normal(loc=0, scale=50)
+            delta_model_params[i*(len(ray_angles)+1) + len(ray_angles)] = np.random.normal(loc=0, scale=math.radians(5))
+        new_score = simulate(model_params + delta_model_params, display)
+        display = False
+        if new_score > score:
+            score = new_score
+            model_params += delta_model_params
+            print("score: ", score)
+            display = True
     
 
+train()
 
 
 # Main loop
